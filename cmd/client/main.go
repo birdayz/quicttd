@@ -1,11 +1,12 @@
 package main
 
 import (
-	"context"
+	"bufio"
 	"crypto/tls"
 	"fmt"
-	"io"
 
+	"github.com/davecgh/go-spew/spew"
+	"github.com/goiiot/libmqtt"
 	"github.com/lucas-clemente/quic-go"
 )
 
@@ -24,26 +25,34 @@ func main() {
 
 	fmt.Println("Dialed")
 
-	stream, err := session.OpenStreamSync(context.Background())
+	stream, err := session.OpenStream()
 	if err != nil {
 		panic(err)
 	}
 
 	fmt.Println("Stream open")
 
-	fmt.Printf("Client: Sending '%s'\n", "hallo")
-	_, err = stream.Write([]byte("hallo"))
+	connPacket := libmqtt.ConnPacket{}
+
+	writer := bufio.NewWriter(stream)
+	reader := bufio.NewReader(stream)
+
+	fmt.Println("Write")
+
+	err = libmqtt.Encode(&connPacket, writer)
 	if err != nil {
 		panic(err)
 	}
 
-	fmt.Println("Waiting for 5 bytes")
+	writer.Flush()
 
-	buf := make([]byte, 5)
-	_, err = io.ReadFull(stream, buf)
+	fmt.Println("Read")
+
+	p, err := libmqtt.Decode(libmqtt.V311, reader)
 	if err != nil {
 		panic(err)
 	}
-	fmt.Printf("Client: Got '%s'\n", buf)
+
+	spew.Dump(p)
 
 }

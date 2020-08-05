@@ -1,7 +1,6 @@
 package main
 
 import (
-	"bytes"
 	"context"
 	"crypto/rand"
 	"crypto/rsa"
@@ -9,9 +8,12 @@ import (
 	"crypto/x509"
 	"encoding/pem"
 	"fmt"
-	"io"
 	"math/big"
 
+	"bufio"
+
+	"github.com/davecgh/go-spew/spew"
+	"github.com/goiiot/libmqtt"
 	quic "github.com/lucas-clemente/quic-go"
 )
 
@@ -40,21 +42,25 @@ func main() {
 
 	fmt.Println("Got stream")
 
-	fmt.Println("Waiting for 5 bytes")
+	packet, err := libmqtt.Decode(libmqtt.V311, bufio.NewReader(stream))
+	if err != nil {
+		fmt.Println("Err", err)
+	}
 
-	buf := make([]byte, 5)
-	_, err = io.ReadFull(stream, buf)
+	connAck := libmqtt.ConnAckPacket{}
+
+	w := bufio.NewWriter(stream)
+
+	err = libmqtt.Encode(&connAck, w)
 	if err != nil {
 		panic(err)
 	}
-	fmt.Printf("Server: Got '%s'\n", buf)
 
-	n, err := io.Copy(stream, bytes.NewReader([]byte("hallo")))
-	if err != nil {
-		panic(err)
-	}
+	w.Flush()
 
-	fmt.Println("Wrote bytes", n)
+	spew.Dump(packet)
+
+	//libmqtt.Deco
 
 	stream.Close()
 
