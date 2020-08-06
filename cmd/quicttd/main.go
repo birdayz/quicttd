@@ -17,15 +17,22 @@ import (
 	quic "github.com/lucas-clemente/quic-go"
 )
 
-func handleSession(session quic.Session) {
-	stream, err := session.AcceptStream(context.Background())
-	if err != nil {
-		panic(err)
+func handleSession(session quic.Session) error {
+	for {
+		stream, err := session.AcceptStream(context.Background())
+		if err != nil {
+			return err
+		}
+
+		go handleStream(stream)
 	}
 
+}
+
+func handleStream(stream quic.Stream) error {
 	packet, err := libmqtt.Decode(libmqtt.V311, bufio.NewReader(stream))
 	if err != nil {
-		fmt.Println("Err", err)
+		return err
 	}
 
 	connAck := libmqtt.ConnAckPacket{}
@@ -34,17 +41,20 @@ func handleSession(session quic.Session) {
 
 	err = libmqtt.Encode(&connAck, w)
 	if err != nil {
-		panic(err)
+		return err
 	}
 
-	w.Flush()
+	err = w.Flush()
+	if err != nil {
+		return err
+	}
 
 	spew.Dump(packet)
 
-	//libmqtt.Deco
-
 	stream.Close()
-	fmt.Println("Stream closed")
+
+	return nil
+
 }
 
 func main() {
@@ -55,6 +65,7 @@ func main() {
 	}
 
 	for {
+		fmt.Println("w8 accept")
 		session, err := lnr.Accept(context.Background())
 		if err != nil {
 			panic(err)
@@ -66,7 +77,7 @@ func main() {
 			fmt.Println("SESS DONE!")
 		}()
 
-		handleSession(session)
+		go handleSession(session)
 	}
 }
 
@@ -76,6 +87,7 @@ func generateTLSConfig() *tls.Config {
 	if err != nil {
 		panic(err)
 	}
+
 	template := x509.Certificate{SerialNumber: big.NewInt(1)}
 	certDER, err := x509.CreateCertificate(rand.Reader, &template, &template, &key.PublicKey, key)
 	if err != nil {
