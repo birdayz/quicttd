@@ -2,6 +2,7 @@ package main
 
 import (
 	"bufio"
+	"context"
 	"crypto/tls"
 	"fmt"
 
@@ -18,7 +19,9 @@ func main() {
 		InsecureSkipVerify: true,
 		NextProtos:         []string{"quic-echo-example"},
 	}
-	session, err := quic.DialAddr(addr, tlsConf, nil)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	session, err := quic.DialAddrContext(ctx, addr, tlsConf, nil)
 	if err != nil {
 		panic(err)
 	}
@@ -52,6 +55,8 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
+
+	stream.Close()
 
 	spew.Dump(p)
 

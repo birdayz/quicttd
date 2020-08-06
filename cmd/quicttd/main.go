@@ -17,30 +17,11 @@ import (
 	quic "github.com/lucas-clemente/quic-go"
 )
 
-func main() {
-
-	addr := "localhost:8090"
-	lnr, err := quic.ListenAddr(addr, generateTLSConfig(), nil)
-	if err != nil {
-		panic(err)
-	}
-
-	fmt.Println("Listening")
-
-	session, err := lnr.Accept(context.Background())
-	if err != nil {
-		panic(err)
-	}
-
-	fmt.Println("Got sess")
-	fmt.Println("Waiting for stream")
-
+func handleSession(session quic.Session) {
 	stream, err := session.AcceptStream(context.Background())
 	if err != nil {
 		panic(err)
 	}
-
-	fmt.Println("Got stream")
 
 	packet, err := libmqtt.Decode(libmqtt.V311, bufio.NewReader(stream))
 	if err != nil {
@@ -63,7 +44,30 @@ func main() {
 	//libmqtt.Deco
 
 	stream.Close()
+	fmt.Println("Stream closed")
+}
 
+func main() {
+	addr := "localhost:8090"
+	lnr, err := quic.ListenAddr(addr, generateTLSConfig(), nil)
+	if err != nil {
+		panic(err)
+	}
+
+	for {
+		session, err := lnr.Accept(context.Background())
+		if err != nil {
+			panic(err)
+		}
+
+		go func() {
+			fmt.Println("Waiting for sess close")
+			<-session.Context().Done()
+			fmt.Println("SESS DONE!")
+		}()
+
+		handleSession(session)
+	}
 }
 
 // Setup a bare-bones TLS config for the server
